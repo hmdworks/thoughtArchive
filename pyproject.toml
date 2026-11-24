@@ -1,0 +1,20 @@
+[project]
+name = "thoughtArchive"
+version = "0.1.0"
+description = "a place to write and recall your thoughts."
+readme = "README.md"
+authors = [
+    { name = "HQ" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "platformdirs>=4.14.8",
+    "typer>=0.29.2",
+]
+
+[project.scripts]
+ta = "thoughtarchive.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.13.9,<0.14.0"]
+build-backend = "uv_build"
