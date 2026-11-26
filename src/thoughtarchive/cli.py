@@ -3,13 +3,28 @@ import typer
 from thoughtarchive.database import (
     initialise_database,
     add_thought,
+    get_recent_thoughts,
+    get_todays_thoughts,
 )
 
 from thoughtarchive.parser import (
-    parse_add_arguments,
+    parse_add_args,
+    parse_view_args,
+)
+
+from thoughtarchive.display import (
+    display_thoughts,
 )
 
 app = typer.Typer(no_args_is_help=True)
+
+
+def format_error(cmd: str, error) -> str:
+    err_prefix = typer.style("ta error: ", fg=typer.colors.BRIGHT_BLACK)
+    err_msg = typer.style(f"{error}", fg=typer.colors.RED, bold=True)
+    err_help = typer.style(f"type `ta {cmd} --help` for more", fg=typer.colors.BRIGHT_BLACK)
+
+    return err_prefix + err_msg + "\n" + err_help
 
 
 @app.callback()
@@ -34,15 +49,11 @@ examples:
 def add(ctx: typer.Context):
     try:
         content, thought_date, thought_time = (
-            parse_add_arguments(ctx.args)
+            parse_add_args(ctx.args)
         )
 
     except ValueError as error:
-        err_prefix = typer.style("ta error: ", fg=typer.colors.BRIGHT_BLACK)
-        err_msg = typer.style(f"{error}", fg=typer.colors.RED, bold=True)
-        err_help = typer.style(f"type `ta add --help` for more", fg=typer.colors.BRIGHT_BLACK)
-
-        typer.echo(err_prefix + err_msg + "\n" + err_help, err=True)
+        typer.echo(format_error("add", error), err=True)
         raise typer.Exit(code=1)
 
     add_thought(
@@ -51,7 +62,57 @@ def add(ctx: typer.Context):
         thought_time,
     )
 
-    typer.echo(f'thought "{content}" saved!')
+    typer.echo(
+        typer.style('thought "', fg=typer.colors.CYAN)
+        + typer.style(content, fg=typer.colors.YELLOW)
+        + typer.style('" saved!', fg=typer.colors.CYAN)
+    )
+
+
+@app.command(
+    help="the number of recent thoughts you want to view (displayed oldest to newest)",
+    epilog="""
+    examples:
+        ta view         (most recent 20)
+        ta view 50      (most recent 50)
+""",
+    context_settings={
+            "allow_extra_args": True,
+            "ignore_unknown_options": True,
+    }
+)
+def view(ctx: typer.Context):
+    try:
+        number = parse_view_args(ctx.args)
+
+    except ValueError as error:
+        typer.echo(format_error("view", error), err=True)
+        raise typer.Exit(code=1)
+
+    thoughts = get_recent_thoughts(number)
+
+    if not thoughts:
+        typer.secho("no thoughts found...", fg=typer.colors.BRIGHT_BLACK)
+        return
+
+    display_thoughts(thoughts)
+
+
+@app.command(
+    help="view your thoughts for this archive day."
+)
+def ls():
+    try:
+        thoughts = get_todays_thoughts()
+    except Exception as error:
+        typer.echo(format_error("ls", error), err=True)
+        raise typer.Exit(code=1)
+
+    if not thoughts:
+        typer.echo("no thoughts recorded for this archive day...")
+        raise typer.Exit()
+
+    display_thoughts(thoughts)
 
 
 if __name__ == "__main__":

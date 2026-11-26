@@ -3,6 +3,8 @@ from contextlib import closing
 
 from platformdirs import user_data_path
 
+from thoughtarchive.parser import get_archive_datetime
+
 
 DB_DIR = user_data_path("thoughtArchive", appauthor=False)
 DB_PATH = DB_DIR / "thoughtarchive.db"
@@ -51,7 +53,7 @@ def add_thought(
     content: str,
     thought_date: str,
     thought_time: str | None,
-) -> int:
+) -> None:
     with closing(get_connection()) as connection:
         with connection:
             connection.execute(
@@ -65,3 +67,47 @@ def add_thought(
                 """,
                 (content, thought_date, thought_time),
             )
+
+
+def get_recent_thoughts(number) -> list[sqlite3.Row]:
+    with closing(get_connection()) as connection:
+        cursor = connection.execute(
+            """
+            SELECT *
+            FROM (
+                SELECT
+                    id,
+                    content,
+                    thought_date AS date,
+                    thought_time AS time
+                FROM thoughts
+                ORDER BY id DESC
+                LIMIT ?
+            )
+            ORDER BY id ASC
+            """,
+            (number,)
+        )
+    
+        return cursor.fetchall()
+
+
+def get_todays_thoughts() -> list[sqlite3.Row]:
+    today = get_archive_datetime()[0].isoformat()
+
+    with closing(get_connection()) as connection:
+        cursor = connection.execute(
+            """
+            SELECT
+                id,
+                content,
+                thought_date AS date,
+                thought_time AS time
+            FROM thoughts
+            WHERE thought_date = ?
+            ORDER BY id ASC
+            """,
+            (today,)
+        )
+    
+        return cursor.fetchall()

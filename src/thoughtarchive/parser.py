@@ -74,22 +74,22 @@ def validate_not_future(
             raise ValueError("thought time cannot be in the future")
 
 
-def parse_add_arguments(
-    arguments: list[str],
+def parse_add_args(
+    args: list[str],
 ) -> tuple[str, str, str | None]:
 
-    content_parts = arguments.copy()
+    content_parts = args.copy()
     datetime_args = []
 
     while content_parts:
-        argument = content_parts[-1]
+        arg = content_parts[-1]
 
         if (
             re.fullmatch(
                 r"\d{2}-\d{2}(?:-\d{2}|\-\d{4})?",
-                argument,
+                arg,
             )
-            or re.fullmatch(r"\d{1,2}:\d{2}", argument)
+            or re.fullmatch(r"\d{1,2}:\d{2}", arg)
         ):
             datetime_args.insert(0, content_parts.pop())
         else:
@@ -105,23 +105,23 @@ def parse_add_arguments(
     date_given = False
     time_given = False
 
-    for argument in datetime_args:
+    for arg in datetime_args:
 
         if re.fullmatch(
             r"\d{2}-\d{2}(?:-\d{2}|\-\d{4})?",
-            argument,
+            arg,
         ):
             if date_given:
                 raise ValueError("only one date is allowed!")
 
-            thought_date = validate_date(argument)
+            thought_date = validate_date(arg)
             date_given = True
 
-        elif re.fullmatch(r"\d{1,2}:\d{2}", argument):
+        elif re.fullmatch(r"\d{1,2}:\d{2}", arg):
             if time_given:
                 raise ValueError("only one time is allowed!")
 
-            thought_time = validate_time(argument)
+            thought_time = validate_time(arg)
             time_given = True
 
     if date_given and not time_given:
@@ -130,3 +130,21 @@ def parse_add_arguments(
     validate_not_future(thought_date, thought_time)
 
     return content, thought_date.isoformat(), thought_time
+
+
+def parse_view_args(args: list[str]) -> int:
+    if not args:
+        return 20
+
+    if len(args) != 1:
+        raise ValueError("only one number is allowed")
+
+    try:
+        number = int(args[0])
+    except ValueError:
+        raise ValueError("number must be a valid integer")
+
+    if number <= 0:
+        raise ValueError("number must be a positive integer >= 1")
+
+    return number
