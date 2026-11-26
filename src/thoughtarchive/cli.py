@@ -1,10 +1,12 @@
-from datetime import date, datetime, timedelta
-
 import typer
 
 from thoughtarchive.database import (
     initialise_database,
     add_thought,
+)
+
+from thoughtarchive.parser import (
+    parse_add_arguments,
 )
 
 app = typer.Typer(no_args_is_help=True)
@@ -15,98 +17,33 @@ def main():
     initialise_database()
 
 
-def get_archive_datetime() -> tuple[str, str]:
-    now = datetime.now().astimezone()
-
-    archive_date = now.date()
-
-    if now.hour < 5:
-        archive_date -= timedelta(days=1)
-
-    return archive_date.isoformat(), now.strftime("%H:%M")
-
-
-def validate_date(value: str) -> str:
-    parts = value.split("-")
-
+@app.command(
+    help="the thought you want to save, followed by an optional date DD-MM(- YY or YYYY) and/or 24-hr time HH:MM",
+    epilog="""
+examples:
+  ta add hello from me                  (now)
+  ta add hello from me 11-11            (saved for 11th Nov 2026)
+  ta add hello from me 12:34            (saved for today at 12:34)
+  ta add "hello it's me" 11-11-11 11:11 (use quotes for special chars, or escape using backslash)
+""",
+    context_settings={
+        "allow_extra_args": True,
+        "ignore_unknown_options": True,
+    }
+)
+def add(ctx: typer.Context):
     try:
-        if len(parts) == 2:
-            day, month = parts
-
-            if len(day) != 2 or len(month) != 2:
-                raise ValueError
-
-            year = date.today().year
-
-        elif len(parts) == 3:
-            day, month, year = parts
-
-            if (
-                len(day) != 2
-                or len(month) != 2
-                or len(year) != 4
-            ):
-                raise ValueError
-
-        else:
-            raise ValueError
-
-        parsed_date = date(
-            int(year),
-            int(month),
-            int(day),
+        content, thought_date, thought_time = (
+            parse_add_arguments(ctx.args)
         )
 
-    except ValueError:
-        raise typer.BadParameter(
-            f"use DD-MM or DD-MM-YYYY, e.g. 01-01 or 13-01-2025"
-        )
+    except ValueError as error:
+        err_prefix = typer.style("ta error: ", fg=typer.colors.BRIGHT_BLACK)
+        err_msg = typer.style(f"{error}", fg=typer.colors.RED, bold=True)
+        err_help = typer.style(f"type `ta add --help` for more", fg=typer.colors.BRIGHT_BLACK)
 
-    return parsed_date.isoformat()
-
-
-def validate_time(value: str) -> str:
-    try:
-        parsed_time = datetime.strptime(value, "%H:%M")
-    except ValueError:
-        raise typer.BadParameter(
-            "please use HH:MM format (24-hour time)"
-        )
-
-    if parsed_time.strftime("%H:%M") != value:
-        raise typer.BadParameter(
-            "please use HH:MM format (24-hour time)"
-        )
-
-    return value
-
-
-@app.command()
-def add(
-    content: str = typer.Argument(
-        ...,
-        help="the thought you want to save (in quotes)",
-    ),
-    thought_date: str | None = typer.Argument(
-        None,
-        help="optional date (DD-MM or DD-MM-YYYY)",
-    ),
-    thought_time: str | None = typer.Argument(
-        None,
-        help="optional time (HH:MM)",
-    ),
-):
-
-    current_date, current_time = get_archive_datetime()
-
-    if thought_date is None:
-        thought_date = current_date
-        thought_time = thought_time or current_time
-    else:
-        thought_date = validate_date(thought_date)
-
-    if thought_time is not None:
-        thought_time = validate_time(thought_time)
+        typer.echo(err_prefix + err_msg + "\n" + err_help, err=True)
+        raise typer.Exit(code=1)
 
     add_thought(
         content,
